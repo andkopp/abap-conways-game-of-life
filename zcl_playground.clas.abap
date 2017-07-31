@@ -35,6 +35,18 @@ CLASS zcl_playground DEFINITION
       RETURNING
         VALUE(num) TYPE i.
 
+    METHODS get_width
+      RETURNING
+        VALUE(rv_width) TYPE i.
+
+    METHODS get_height
+      RETURNING
+        VALUE(rv_height) TYPE i.
+
+    METHODS get_as_alv_table
+      RETURNING
+        VALUE(rt_playground) TYPE REF TO data.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     DATA: fields TYPE field_table.
@@ -197,4 +209,64 @@ CLASS zcl_playground IMPLEMENTATION.
     me->fields = lt_new_fields.
 
   ENDMETHOD.
+
+  METHOD get_width.
+
+* Get distinct columns (x)
+    LOOP AT me->fields ASSIGNING FIELD-SYMBOL(<field>)
+        GROUP BY ( x = <field>-x ) ASCENDING
+        WITHOUT MEMBERS ASSIGNING FIELD-SYMBOL(<unique_field>).
+      CHECK <unique_field>-x > rv_width.
+      rv_width = <unique_field>-x.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD get_height.
+    LOOP AT me->fields ASSIGNING FIELD-SYMBOL(<field>).
+      CHECK <field>-y > rv_height.
+      rv_height = <field>-y.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD get_as_alv_table.
+
+    FIELD-SYMBOLS: <dyn_table> TYPE STANDARD TABLE.
+    DATA: gr_line TYPE REF TO data.
+
+* Generate field catalog with dynamic dimensions
+    DATA(lt_fcat) = VALUE lvc_t_fcat(
+     FOR i = 1 THEN i + 1 UNTIL i = me->get_width( ) "= max(x)
+      (
+        fieldname = |X{ i }|      "Field Name
+        outputlen = i + 4         "Output Length
+        tabname   = 'GT_DATA'     "Internal Table Name
+        coltext   = |x = { i }|   "Header Text for the Column
+        col_pos   = i             "Column position
+        key       = abap_false    "Flag Key field
+      )
+    ).
+
+* Create table
+    cl_alv_table_create=>create_dynamic_table(
+        EXPORTING
+            it_fieldcatalog         = lt_fcat
+            i_style_table           = abap_true
+        IMPORTING
+          ep_table                  = rt_playground
+        EXCEPTIONS
+          generate_subpool_dir_full = 1
+          OTHERS                    = 2
+    ).
+
+* TODO: Populate table...
+    IF sy-subrc = 0.
+      ASSIGN rt_playground->* TO <dyn_table>.
+      CREATE DATA gr_line LIKE LINE OF <dyn_table>.
+      ASSIGN gr_line->* TO FIELD-SYMBOL(<dyn_line>).
+
+    ENDIF.
+
+  ENDMETHOD.
+
 ENDCLASS.
