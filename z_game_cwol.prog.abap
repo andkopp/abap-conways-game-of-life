@@ -9,3 +9,5 @@ START-OF-SELECTION.
     lo_playground->transform( ).
 
   ENDDO.
+
+  lo_playground->get_as_alv_table( ).

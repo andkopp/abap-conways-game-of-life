@@ -5,6 +5,9 @@ CLASS zcl_cell DEFINITION
 
   PUBLIC SECTION.
     TYPES: t_state TYPE string.
+
+* TODO Replace by Enum with NetWeaver 7.51 so the environment checks value
+* -> no text needed then
     CONSTANTS: alive TYPE t_state VALUE 'alive',
                dead  TYPE t_state VALUE 'dead'.
 

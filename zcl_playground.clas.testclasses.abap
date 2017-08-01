@@ -12,7 +12,7 @@ CLASS ltcl_playground DEFINITION FINAL FOR TESTING
       test_transform_dummy1 FOR TESTING RAISING cx_static_check,
       test_transform_tile FOR TESTING RAISING cx_static_check,
       test_transform_blinker FOR TESTING RAISING cx_static_check,
-      test_dynamic_table_3x3 FOR TESTING RAISING cx_static_check.
+      test_alv_table_blinker FOR TESTING RAISING cx_static_check.
 ENDCLASS.
 
 
@@ -359,13 +359,50 @@ CLASS ltcl_playground IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD test_dynamic_table_3x3.
+  METHOD test_alv_table_blinker.
+
+    FIELD-SYMBOLS: <dyn_table> TYPE STANDARD TABLE.
 
     DATA(lo_playground) = zcl_playground_factory=>get_instance( )->get_playground_blinker( ).
 
     DATA(lo_table) = lo_playground->get_as_alv_table( ).
 
-* TODO: Check column dimension, and check if values are set correctly...
+    cl_abap_unit_assert=>assert_bound( lo_table ).
+
+    ASSIGN lo_table->* TO <dyn_table>.
+
+* Check line dimension
+    cl_abap_unit_assert=>assert_equals(
+        act = lines( <dyn_table> )
+        exp = 3
+    ).
+
+* Check column dimension, and check if values are set correctly...
+    LOOP AT <dyn_table> ASSIGNING FIELD-SYMBOL(<line>).     "y-axis
+      DATA(lv_line_idx) = sy-tabix.
+      DO 3 TIMES.                                           "x-axis
+        DATA(lv_col_idx) = sy-index.
+        ASSIGN COMPONENT |X{ lv_col_idx }| OF STRUCTURE <line> TO FIELD-SYMBOL(<comp>).
+        cl_abap_unit_assert=>assert_subrc(
+            exp = 0
+            act = sy-subrc
+        ).
+        cl_abap_unit_assert=>assert_true(
+            COND abap_bool(
+                WHEN lv_line_idx = 1 AND lv_col_idx = 1 AND <comp> = zcl_cell=>dead  THEN abap_true
+                WHEN lv_line_idx = 1 AND lv_col_idx = 2 AND <comp> = zcl_cell=>dead  THEN abap_true
+                WHEN lv_line_idx = 1 AND lv_col_idx = 3 AND <comp> = zcl_cell=>dead  THEN abap_true
+                WHEN lv_line_idx = 2 AND lv_col_idx = 1 AND <comp> = zcl_cell=>alive THEN abap_true
+                WHEN lv_line_idx = 2 AND lv_col_idx = 2 AND <comp> = zcl_cell=>alive THEN abap_true
+                WHEN lv_line_idx = 2 AND lv_col_idx = 3 AND <comp> = zcl_cell=>alive THEN abap_true
+                WHEN lv_line_idx = 3 AND lv_col_idx = 1 AND <comp> = zcl_cell=>dead  THEN abap_true
+                WHEN lv_line_idx = 3 AND lv_col_idx = 2 AND <comp> = zcl_cell=>dead  THEN abap_true
+                WHEN lv_line_idx = 3 AND lv_col_idx = 3 AND <comp> = zcl_cell=>dead  THEN abap_true
+                ELSE abap_false
+            )
+        ).
+      ENDDO.
+    ENDLOOP.
 
   ENDMETHOD.
 

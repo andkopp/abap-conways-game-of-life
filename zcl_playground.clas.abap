@@ -5,11 +5,11 @@ CLASS zcl_playground DEFINITION
 
   PUBLIC SECTION.
     TYPES: BEGIN OF t_field,
-             x    TYPE i,
-             y    TYPE i,
+             x    TYPE i,                   "bottom left is x = 1
+             y    TYPE i,                   "bottom left is y = 1
              cell TYPE REF TO zcl_cell,
            END OF t_field.
-    TYPES: field_table TYPE SORTED TABLE OF t_field WITH UNIQUE KEY x y.
+    TYPES: field_table          TYPE SORTED TABLE OF t_field WITH UNIQUE KEY x y.
 
     METHODS set_cell
       IMPORTING
@@ -121,8 +121,8 @@ CLASS zcl_playground IMPLEMENTATION.
       ).
 
       READ TABLE me->fields
-              INTO DATA(ls_field)
-              WITH KEY x = lv_x
+        INTO DATA(ls_field)
+        WITH TABLE KEY x = lv_x
                        y = lv_y.
       IF sy-subrc = 0.
         INSERT ls_field INTO TABLE rt_fields.
@@ -231,15 +231,17 @@ CLASS zcl_playground IMPLEMENTATION.
 
   METHOD get_as_alv_table.
 
+* x-axis: one column per x
+* y-axis: y = sy-tabix (reversed)
     FIELD-SYMBOLS: <dyn_table> TYPE STANDARD TABLE.
     DATA: gr_line TYPE REF TO data.
 
 * Generate field catalog with dynamic dimensions
     DATA(lt_fcat) = VALUE lvc_t_fcat(
-     FOR i = 1 THEN i + 1 UNTIL i = me->get_width( ) "= max(x)
+     FOR i = 1 THEN i + 1 UNTIL i > me->get_width( ) "= max(x)
       (
         fieldname = |X{ i }|      "Field Name
-        outputlen = i + 4         "Output Length
+        outputlen = 8             "Output Length
         tabname   = 'GT_DATA'     "Internal Table Name
         coltext   = |x = { i }|   "Header Text for the Column
         col_pos   = i             "Column position
@@ -259,11 +261,39 @@ CLASS zcl_playground IMPLEMENTATION.
           OTHERS                    = 2
     ).
 
-* TODO: Populate table...
+* Populate table
     IF sy-subrc = 0.
       ASSIGN rt_playground->* TO <dyn_table>.
       CREATE DATA gr_line LIKE LINE OF <dyn_table>.
       ASSIGN gr_line->* TO FIELD-SYMBOL(<dyn_line>).
+
+* We need a different order...
+* y descending (highest y-value is the lowest sy-tabix)
+* x ascending
+      DATA(lv_y) = me->get_height( ).    "= max(y) = number of rows
+
+      WHILE lv_y >= 1.
+        DATA(lv_x) = 1.
+
+        WHILE lv_x <= me->get_width( ).
+          READ TABLE me->fields
+            ASSIGNING FIELD-SYMBOL(<field>)
+            WITH TABLE KEY x = lv_x
+                           y = lv_y.
+          IF sy-subrc = 0.
+            ASSIGN COMPONENT |X{ lv_x }| OF STRUCTURE <dyn_line> TO FIELD-SYMBOL(<comp>).
+            IF sy-subrc = 0.
+              <comp> = <field>-cell->get_state( ).
+              UNASSIGN <comp>.
+            ENDIF.
+          ENDIF.
+          lv_x = lv_x + 1.
+        ENDWHILE.
+
+        APPEND <dyn_line> TO <dyn_table>.
+        CLEAR <dyn_line>.
+        lv_y = lv_y - 1.
+      ENDWHILE.
 
     ENDIF.
 
